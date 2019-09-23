@@ -1,4 +1,4 @@
-﻿namespace Jobbr.Execution.InProcess
+﻿namespace Jobbr.Execution.InProcess.Execution
 {
     public class JobRunEndedEventArgs
     {

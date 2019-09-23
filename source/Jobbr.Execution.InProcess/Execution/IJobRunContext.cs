@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Jobbr.Execution.InProcess
+namespace Jobbr.Execution.InProcess.Execution
 {
     internal interface IJobRunContext
     {

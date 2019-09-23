@@ -8,7 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jobbr.Execution.InProcess.Logging;
 
-namespace Jobbr.Execution.InProcess
+namespace Jobbr.Execution.InProcess.Execution
 {
     public class InProcessJobExecutor : IJobExecutor
     {
@@ -17,7 +17,14 @@ namespace Jobbr.Execution.InProcess
         private readonly List<PlannedJobRun> plannedJobRuns = new List<PlannedJobRun>();
         private bool isStarted;
         private readonly object syncRoot = new object();
-        private readonly List<Task> _activeContexts = new List<Task>();
+        private readonly List<IJobRunContext> activeContexts = new List<IJobRunContext>();
+        private readonly InProcessExecutorConfiguration configuration;
+        private readonly IDateTimeProvider dateTimeProvider;
+
+        public InProcessJobExecutor(InProcessExecutorConfiguration configuration)
+        {
+            this.configuration = configuration;
+        }
 
 
         public void Dispose()
@@ -83,7 +90,8 @@ namespace Jobbr.Execution.InProcess
 
         public void Start()
         {
-            isStarted = true;
+            // nothing much to do here buy set the isStarted flag to true to respect API usage
+            this.isStarted = true;
         }
 
         public void Stop()
@@ -91,9 +99,59 @@ namespace Jobbr.Execution.InProcess
             throw new NotImplementedException();
         }
 
+        private void startJob()
+        {
+            lock (this.syncRoot)
+            {
+                var possibleJobsToStart = this.configuration.MaxConcurrentProcesses - this.activeContexts.Count;
+                var readyJobs = this.plannedJobRuns.Where(jr => jr.PlannedStartDateTimeUtc <= this.dateTimeProvider.GetUtcNow()).OrderBy(jr => jr.PlannedStartDateTimeUtc).ToList();
+
+                var jobsToStart = readyJobs.Take(possibleJobsToStart).ToList();
+
+                var queueCannotStartAll = readyJobs.Count > possibleJobsToStart;
+                var showStatusInformationNow = (DateTime.Now.Second % 5) == 0;
+                var canStartAllReadyJobs = jobsToStart.Count > 0 && jobsToStart.Count <= possibleJobsToStart;
+
+                if ((queueCannotStartAll && showStatusInformationNow) || canStartAllReadyJobs)
+                {
+                    Logger.Info($"There are {readyJobs.Count} planned jobs in the queue and currently {this.activeContexts.Count} running jobs. Number of possible jobs to start: {possibleJobsToStart}");
+                }
+
+                foreach (var jobRun in jobsToStart)
+                {
+                    Logger.Debug($"Trying to start job with Id '{jobRun.Id}' which was planned for {jobRun.PlannedStartDateTimeUtc}.");
+
+                    IJobRunContext wrapper = null;
+
+                    try
+                    {
+                        Logger.Debug($"Getting Metadata for a job (Id '{jobRun.Id}') that needs to be started.");
+                        var jobRunInfo = this.jobRunInformationService.GetByJobRunId(jobRun.Id);
+
+                        wrapper = this.jobRunContextFactory.CreateJobRunContext(jobRunInfo);
+
+                        this.activeContexts.Add(wrapper);
+                        this.plannedJobRuns.Remove(jobRun);
+
+                        wrapper.Ended += this.ContextOnEnded;
+                        wrapper.Start();
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.ErrorException($"Exception was thrown while starting a new JobRun with Id: {jobRun.Id}.", e);
+
+                        if (wrapper != null)
+                        {
+                            wrapper.Ended -= this.ContextOnEnded;
+                        }
+                    }
+                }
+            }
+        }
+
         private void determineNextRun()
         {
-            this.plannedJobRuns.
+            
 
         }
     }
