@@ -19,11 +19,16 @@ namespace Jobbr.Execution.InProcess.Execution
         private readonly object syncRoot = new object();
         private readonly List<IJobRunContext> activeContexts = new List<IJobRunContext>();
         private readonly InProcessExecutorConfiguration configuration;
+        private readonly IJobRunInformationService jobRunInformationService;
         private readonly IDateTimeProvider dateTimeProvider;
+        private readonly IJobRunContextFactory jobRunContextFactory;
 
-        public InProcessJobExecutor(InProcessExecutorConfiguration configuration)
+        public InProcessJobExecutor(InProcessExecutorConfiguration configuration, IJobRunInformationService jobRunInformationService, IDateTimeProvider dateTimeProvider, IJobRunContextFactory jobRunContextFactory)
         {
             this.configuration = configuration;
+            this.jobRunInformationService = jobRunInformationService;
+            this.dateTimeProvider = dateTimeProvider;
+            this.jobRunContextFactory = jobRunContextFactory;
         }
 
 
@@ -147,12 +152,6 @@ namespace Jobbr.Execution.InProcess.Execution
                     }
                 }
             }
-        }
-
-        private void determineNextRun()
-        {
-            
-
         }
     }
 }
